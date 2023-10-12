@@ -1,0 +1,116 @@
+[Install 2 instances]
+1 for jenkins
+2 for sonarqube
+
+
+
+[Installation of jenkins ]
+
+install docker in jenkins terminal (apt-get install docker.io)
+install maven in jenkins terminal [cd /opt]
+docker login
+username : dockerhub username
+password : dockerhub accesstoken
+
+sudo usermod -aG docker jenkins
+sudo systemctl restart jenkins
+sudo systemctl restart docker
+
+[Installation of sonarqube]
+
+
+jenkins dashboard 
+plugins :- 
+Docker Pipeline
+Docker-build-step
+Docker Api Plugin
+sonarQube scanner 
+
+Go to jenkins dashboard :
+
+Managejenkins :
+
+Credentials :
+
+[Add docker crendentias]:
+kind useraname & password 
+username : dockerhub username
+password : Enter dockerhub access token    [Go to dockerhub dashboard >> Accountsettings>>security>> add new access token (read write delete) ]
+
+[Add sonarQube credentials]:
+Kind secret text
+Secret : sonarqube token   [ Go to sonarQube dashboard >>My account>> security>> add token]
+ID : Sonar-token  
+Description : Sonar-token
+
+
+Managejenkins :
+System :
+Select environments variables:
+Add sonarqube scanner
+Name : Sonar
+url : sonardashboard_url
+add sonartoken
+Apply & Save.
+
+Manage jenkins :
+Tools :
+Add docker :
+Name : docker
+Select Install automatically and download from docker.com
+
+Add sonarserver :
+Name : sonar
+default 
+Apply& Save 
+ 
+
+
+
+
+
+
+    [JENKINSFILE]
+
+pipeline {
+    agent any
+    environment {    [maven path]
+        PATH ="$PATH:/opt/apache-maven-3.9.5/bin"
+    }
+    stages {
+        stage('get code') {
+            steps {
+                git 'githubrepository_url' 
+            }
+        }
+        stage('mvn package') {
+            steps {
+                sh 'mvn clean install'
+            }
+        }
+        stage('SonarQubeAnalysis') {
+            steps {          [sonarqube system name] [ check in jenkins dashboard>>managejenkins>>system>>sonarqube installations]    
+                withSonarQubeEnv('sonarname') {
+                    sh 'mvn sonar:sonar'
+                }
+            }
+        }
+        stage('Dockerbuild & docker Push & create docker container') {
+            steps {
+                script {                
+                                    [dockerhubusername/imagename]     [Dockerfile path in jenkins terminal]
+                     sh 'docker build -t venky7287/marolix:latest -f /var/lib/jenkins/workspace/jenkinspipeline/Dockerfile .'
+                                                           [check in docker credentials]        [dockerhub username]                [dockerhub accesstoken]
+                     withCredentials([usernamePassword(credentialsId: 'dockerHub', usernameVariable: 'venky7287', passwordVariable: 'dckr_pat_UtDVNl0Wpxbfg-GMV0agbcKMCJ4')]) {
+                    sh '''          [dockerhub username]    [dockerhub accesstoken]
+                        docker login -u venky7287 -p dckr_pat_UtDVNl0Wpxbfg-GMV0agbcKMCJ4
+                                  [dockerhub username/imagename]
+                        docker push venky7287/marolix:latest
+                    '''                      [containername]           [dockerhub username/imagename]
+                    sh 'docker run -itd --name docker1263564635 -p 8060:80 venky7287/marolix:latest'
+                     }
+                } 
+            }
+        }
+    }
+}
